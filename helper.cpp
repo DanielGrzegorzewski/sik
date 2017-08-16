@@ -120,3 +120,8 @@ bool parse_datagram(unsigned char *datagram, uint32_t len, uint64_t &session_id,
 
     return true;
 }
+
+Datagram::Datagram(unsigned char *buffer, size_t len)
+{
+    parse_datagram(buffer, len, this->session_id, this->turn_direction, this->next_expected_event_no, this->player_name);
+}

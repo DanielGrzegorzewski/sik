@@ -50,20 +50,15 @@ int main(int argc, char *argv[]) {
             else {
                 (void) printf("read from socket: %zd bytes: %.*s\n", len,
                         (int) len, buffer);
-                sflags = 0;
-                buffer[22] = '\0';
-
+                
+                //sflags = 0;
                 //snd_len = sendto(sock, buffer, (size_t) len, sflags,
                 //        (struct sockaddr *) &client_address, snda_len);
                 //if (snd_len != len)
                 //    syserr("error on sending datagram to client socket");
-                //bool parse_datagram(unsigned char *datagram, uint64_t &session_id, int8_t &turn_direction, uint32_t &next_expected_event_no, std::string &player_name)
-                uint64_t session_id;
-                int8_t turn_direction;
-                uint32_t next_expected_event_no;
-                std::string player_name;
-                parse_datagram(buffer, len, session_id, turn_direction, next_expected_event_no, player_name);
-                std::cout<<"session_id: "<<session_id<<"\nturn_direction: "<<static_cast<int16_t>(turn_direction)<<"\nnext_expected_event_no: "<<next_expected_event_no<<"\nplayer_name: "<<player_name<<"\n";
+                
+                Datagram datagram(buffer, len);
+                std::cout<<"session_id: "<<datagram.session_id<<"\nturn_direction: "<<static_cast<int16_t>(datagram.turn_direction)<<"\nnext_expected_event_no: "<<datagram.next_expected_event_no<<"\nplayer_name: "<<datagram.player_name<<"\n";
             }
         } while (len > 0);
         (void) printf("finished exchange\n");

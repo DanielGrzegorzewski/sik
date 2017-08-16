@@ -1,13 +1,16 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netdb.h>
 #include <stdio.h>
-#include <string.h>
+#include <cstring>
+#include <iostream>
 #include <unistd.h>
 
 #include "err.h"
+#include "helper.h"
 
-#define BUFFER_SIZE   1000
+#define BUFFER_SIZE   100
 #define PORT_NUM     12345
 
 int main(int argc, char *argv[]) {
@@ -16,7 +19,7 @@ int main(int argc, char *argv[]) {
     struct sockaddr_in server_address;
     struct sockaddr_in client_address;
 
-    char buffer[BUFFER_SIZE];
+    unsigned char buffer[BUFFER_SIZE];
     socklen_t snda_len, rcva_len;
     ssize_t len, snd_len;
 
@@ -48,10 +51,19 @@ int main(int argc, char *argv[]) {
                 (void) printf("read from socket: %zd bytes: %.*s\n", len,
                         (int) len, buffer);
                 sflags = 0;
-                snd_len = sendto(sock, buffer, (size_t) len, sflags,
-                        (struct sockaddr *) &client_address, snda_len);
-                if (snd_len != len)
-                    syserr("error on sending datagram to client socket");
+                buffer[22] = '\0';
+
+                //snd_len = sendto(sock, buffer, (size_t) len, sflags,
+                //        (struct sockaddr *) &client_address, snda_len);
+                //if (snd_len != len)
+                //    syserr("error on sending datagram to client socket");
+                //bool parse_datagram(unsigned char *datagram, uint64_t &session_id, int8_t &turn_direction, uint32_t &next_expected_event_no, std::string &player_name)
+                uint64_t session_id;
+                int8_t turn_direction;
+                uint32_t next_expected_event_no;
+                std::string player_name;
+                parse_datagram(buffer, len, session_id, turn_direction, next_expected_event_no, player_name);
+                std::cout<<"session_id: "<<session_id<<"\nturn_direction: "<<static_cast<int16_t>(turn_direction)<<"\nnext_expected_event_no: "<<next_expected_event_no<<"\nplayer_name: "<<player_name<<"\n";
             }
         } while (len > 0);
         (void) printf("finished exchange\n");

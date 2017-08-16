@@ -68,8 +68,8 @@ void set_ui_port(std::string &ui_server_host, uint16_t &ui_port)
 bool parse_client_arguments(int argc, char *argv[], std::string &player_name, std::string &game_server_host, 
 							uint16_t &server_port, std::string &ui_server_host, uint16_t &ui_port)
 {
-	//if (argc != 3 && argc != 4)
-	//	fatal(WRONG_CLIENT_ARGS);
+	if (argc != 3 && argc != 4)
+		fatal(WRONG_CLIENT_ARGS);
 	player_name = argv[1];
 	if (!check_player_name(player_name))
 		fatal(WRONG_PLAYER_NAME);
@@ -80,3 +80,4 @@ bool parse_client_arguments(int argc, char *argv[], std::string &player_name, st
 		ui_server_host = argv[3];
 	set_ui_port(ui_server_host, ui_port);
 }
+

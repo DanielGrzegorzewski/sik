@@ -12,7 +12,7 @@ uint64_t get_current_timestamp()
 {
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
-	return ((uint64_t)tv.tv_usec)*1000000+tv.tv_usec;
+	return ((uint64_t)tv.tv_sec)*1000000+tv.tv_usec;
 }
 
 Player::Player(int argc, char **argv)
@@ -38,6 +38,8 @@ void Player::send_player_datagram()
     std::string datagram_str = this->make_datagram();
     size_t datagram_length = datagram_str.size();
     unsigned char *datagram = new unsigned char[datagram_length];
+    for (size_t i = 0; i < datagram_length; ++i)
+        datagram[i] = datagram_str[i];
     send_datagram(this, datagram, datagram_length);
     delete[] datagram;
 }

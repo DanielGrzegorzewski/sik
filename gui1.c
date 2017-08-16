@@ -287,7 +287,7 @@ gint main (gint argc, gchar *argv[]) {
   GtkWidget *box1, *box2, *box3;
   GtkWidget *event_box;
   GtkWidget *button;
-  int idle_id;
+  //int idle_id;
 
   unsigned short port = 12346;  //default
 
@@ -303,7 +303,7 @@ gint main (gint argc, gchar *argv[]) {
   init_colors();
 
   // Ustawienie callbacka dla idle
-  idle_id = g_idle_add(idle_callback, &started);
+  g_idle_add(idle_callback, &started);
   
   // Utworzenie głównego okna aplikacji
   window = gtk_window_new(GTK_WINDOW_TOPLEVEL);

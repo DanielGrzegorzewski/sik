@@ -1,21 +1,12 @@
-#include <sys/types.h>
-#include <sys/socket.h>
 #include <netdb.h>
-#include <stdio.h>
-#include <string.h>
 #include <unistd.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <stdarg.h>
-#include <errno.h>
 #include <iostream>
-#include <cstring>
-#include <vector>
 
 #include "err.h"
-#include "constans.h"
 #include "player.h"
 #include "helper.h"
+
+int BUFFER_SIZE = 100;
 
 int main(int argc, char *argv[]) 
 {

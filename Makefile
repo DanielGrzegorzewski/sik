@@ -6,10 +6,10 @@ CC = gcc
 
 CFLAGS=-std=c99 -Wall -Wunused -DDEBUG
 
-siktacka-client: siktacka-client.cpp err.c
-	g++ siktacka-client.cpp err.c -o siktacka-client -std=c++11
+siktacka-client: siktacka-client.cpp
+	g++ siktacka-client.cpp err.c player.cpp helper.cpp parser.cpp -o siktacka-client -std=c++11
 	
-siktacka-server: siktacka-server.cpp err.c
+siktacka-server: siktacka-server.cpp
 	g++ siktacka-server.cpp err.c -o siktacka-server -std=c++11
 	
 gui1: gui1.c $(SRC) gui.h 

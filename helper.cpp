@@ -34,6 +34,11 @@ void receive_datagram(Player *player, unsigned char *datagram, int len)
         syserr("read");
 }
 
+rcva_len = (socklen_t) sizeof(client_address);
+            flags = 0; // we do not request anything special
+            len = recvfrom(server.sock, buffer, sizeof(buffer), flags,
+                    (struct sockaddr *) &client_address, &rcva_len);
+
 unsigned long long read_time(unsigned  char* buffer)
 {
     unsigned long long res = 0;

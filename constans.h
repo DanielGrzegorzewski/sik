@@ -13,5 +13,9 @@ const int SENDING_INTERVAL = 20;
 const int BUFFER_SIZE = 80000;
 const int MIN_PORT_VALUE = 1;
 const int MAX_PORT_VALUE = 65535;
+const int DEFAULT_MAP_WIDTH = 800;
+const int DEFAULT_MAP_HEIGHT = 600;
+const int DEFAULT_GAME_SPEED = 50;
+const int DEFAULT_TURN_SPEED = 6;
 
 #endif

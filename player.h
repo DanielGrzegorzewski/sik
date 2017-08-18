@@ -16,7 +16,7 @@ class Player
     public:
         int sock;
         struct addrinfo addr_hints;
-        struct sockaddr_in my_address;
+        struct sockaddr_in server_address;
 
         Player(int argc, char *argv[]);
         void make_socket();

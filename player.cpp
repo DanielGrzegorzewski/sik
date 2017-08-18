@@ -60,10 +60,10 @@ void Player::make_socket()
     if (getaddrinfo(this->game_server_host.c_str(), NULL, &this->addr_hints, &addr_result) != 0)
         syserr("getaddrinfo");
 
-    this->my_address.sin_family = AF_INET;
-    this->my_address.sin_addr.s_addr =
+    this->server_address.sin_family = AF_INET;
+    this->server_address.sin_addr.s_addr =
         ((struct sockaddr_in*) (addr_result->ai_addr))->sin_addr.s_addr;
-    this->my_address.sin_port = htons(this->server_port);
+    this->server_address.sin_port = htons(this->server_port);
 
     freeaddrinfo(addr_result);
 

@@ -36,7 +36,7 @@ Server::Server(int argc, char *argv[])
 
     int opt;
     // TODO dodaj parsowanie, sprawdzanie danych
-    while ((opt = getopt(argc, argv, "WHpstr:")) != -1) {
+    while ((opt = getopt(argc, argv, "W:H:p:s:t:r:")) != -1) {
         switch (opt) {
             case 'W':
                 this->map_width = atoi(optarg);
@@ -144,6 +144,7 @@ void Server::receive_datagram_from_client(unsigned char *datagram, int len, stru
     socklen_t rcva_len;
 
     memset(datagram, 0, sizeof(datagram));
+    rcva_len = (socklen_t) sizeof(srvr_address);
     rcv_len = recvfrom(this->sock, datagram, len, flags,
         (struct sockaddr *) &srvr_address, &rcva_len);
     if (rcv_len < 0)
@@ -156,7 +157,7 @@ void Server::send_datagram_to_client(struct sockaddr_in *client_address, unsigne
     socklen_t snda_len;
     ssize_t snd_len;
 
-    snda_len = (socklen_t) sizeof(client_address);
+    snda_len = (socklen_t) sizeof(*client_address);
     snd_len = sendto(this->sock, datagram, (size_t) len, sflags,
             (struct sockaddr *) client_address, snda_len);
     if (snd_len != len)

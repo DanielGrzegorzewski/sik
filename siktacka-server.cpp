@@ -16,10 +16,7 @@ int main(int argc, char *argv[]) {
 
     for (;;) {
         do {
-            server.receive_datagram_from_client(buffer, (size_t)sizeof(buffer), client_address, len);
-            //(void) printf("read from socket: %zd bytes: %.*s\n", len,
-            //        (int) len, buffer);
-                
+            server.receive_datagram_from_client(buffer, (size_t)sizeof(buffer), client_address, len);                
             server.send_datagram_to_client(&client_address, buffer, len);
                 
             Datagram datagram(buffer, len);

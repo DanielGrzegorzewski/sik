@@ -6,73 +6,7 @@
 #include "err.h"
 #include "server.h"
 #include "constans.h"
-
-void Server::make_socket()
-{
-    this->sock = socket(AF_INET, SOCK_DGRAM, 0); // creating IPv4 UDP socket
-    if (this->sock < 0)
-        syserr("socket");
-
-    this->server_address.sin_family = AF_INET; // IPv4
-    this->server_address.sin_addr.s_addr = htonl(INADDR_ANY);
-    this->server_address.sin_port = htons(this->server_port);
-
-    if (bind(this->sock, (struct sockaddr *) &(this->server_address),
-            (socklen_t) sizeof(server_address)) < 0)
-        syserr("bind");
-}
-
-
-
-Server::Server(int argc, char *argv[])
-{
-    this->map_width = DEFAULT_MAP_WIDTH;
-    this->map_height = DEFAULT_MAP_HEIGHT;
-    this->server_port = atoi(DEFAULT_SERVER_PORT);
-    this->game_speed = DEFAULT_GAME_SPEED;
-    this->turn_speed = DEFAULT_TURN_SPEED;
-    this->seed = time(NULL);
-    this->get_random_first_call = true;
-
-    int opt;
-    // TODO dodaj parsowanie, sprawdzanie danych
-    while ((opt = getopt(argc, argv, "W:H:p:s:t:r:")) != -1) {
-        switch (opt) {
-            case 'W':
-                this->map_width = atoi(optarg);
-                break;
-            case 'H':
-                this->map_height = atoi(optarg);
-                break;
-            case 'p':
-                this->server_port = atoi(optarg);
-                break;
-            case 's':
-                this->game_speed = atoi(optarg);
-                break;
-            case 't':
-                this->turn_speed = atoi(optarg);
-                break;
-            case 'r':
-                this->seed = atoi(optarg);
-                break;
-            default: /* '?' */
-                fprintf(stderr, "Usage: %s [-t nsecs] [-n] name\n",
-                        argv[0]);
-                exit(EXIT_FAILURE);
-        }
-    }
-}
-
-uint64_t Server::get_random()
-{
-    static int r = 0;
-    if (this->get_random_first_call) {
-        this->get_random_first_call = false;
-        return r = this->seed;
-    }
-    return r = ((uint64_t)r * 279470273) % 4294967291;
-}
+#include "helper.h"
 
 uint64_t read_8_byte_number(unsigned char *buffer)
 {
@@ -136,6 +70,123 @@ bool parse_datagram(unsigned char *datagram, uint32_t len, uint64_t &session_id,
 Datagram::Datagram(unsigned char *buffer, size_t len)
 {
     parse_datagram(buffer, len, this->session_id, this->turn_direction, this->next_expected_event_no, this->player_name);
+}
+
+Event::Event(uint32_t event_type)
+{
+    this->event_type = event_type;
+    this->event_data = "";
+}
+
+void Event::create_event_new_game(uint32_t maxx, uint32_t maxy, std::vector<std::string> &players_name)
+{
+    this->event_data += make_message_from_n_byte(maxx, 4);
+    this->event_data += make_message_from_n_byte(maxy, 4);
+    for (std::string str: players_name)
+        this->event_data += str + '\0';
+}
+
+void Event::create_event_pixel(int8_t player_number, uint32_t x, uint32_t y)
+{
+    //check bo signed
+    this->event_data += make_message_from_n_byte(player_number, 1);
+    this->event_data += make_message_from_n_byte(x, 4);
+    this->event_data += make_message_from_n_byte(y, 4);
+}
+
+void Event::create_event_player_eliminated(int8_t player_number)
+{
+    this->event_data += make_message_from_n_byte(player_number, 1);
+}
+
+
+void Server::make_socket()
+{
+    this->sock = socket(AF_INET, SOCK_DGRAM, 0); // creating IPv4 UDP socket
+    if (this->sock < 0)
+        syserr("socket");
+
+    this->server_address.sin_family = AF_INET; // IPv4
+    this->server_address.sin_addr.s_addr = htonl(INADDR_ANY);
+    this->server_address.sin_port = htons(this->server_port);
+
+    if (bind(this->sock, (struct sockaddr *) &(this->server_address),
+            (socklen_t) sizeof(server_address)) < 0)
+        syserr("bind");
+}
+
+// Konwertuje ciag znakow na liczbe jezeli owa jest liczba
+// mniejsza od 2^20, w.p.p zwraca 2^30
+uint64_t get_int(char *buffer)
+{
+    uint64_t result = 1<<30;
+    int len = strlen(buffer);
+    if (len >= 7)
+        return result;
+    for (int i = 0; i < len; ++i)
+        if (buffer[i] < '0' || buffer[i] > '9')
+            return result;
+    result = (uint64_t)atoi(buffer);
+    return result;
+}
+
+bool check_port(uint32_t port)
+{
+    if (port < MIN_PORT_VALUE || port > MAX_PORT_VALUE)
+        return false;
+    return true;
+}
+
+Server::Server(int argc, char *argv[])
+{
+    this->map_width = DEFAULT_MAP_WIDTH;
+    this->map_height = DEFAULT_MAP_HEIGHT;
+    this->server_port = atoi(DEFAULT_SERVER_PORT);
+    this->game_speed = DEFAULT_GAME_SPEED;
+    this->turn_speed = DEFAULT_TURN_SPEED;
+    this->seed = time(NULL);
+    this->get_random_first_call = true;
+
+    int opt;
+    while ((opt = getopt(argc, argv, "W:H:p:s:t:r:")) != -1) {
+        uint32_t num = get_int(optarg);
+        if (num == (1<<30))
+            syserr("Wrong call parameter(s)");
+        switch (opt) {
+            case 'W':
+                this->map_width = num;
+                break;
+            case 'H':
+                this->map_height = num;
+                break;
+            case 'p':
+                if (!check_port(num))
+                    syserr("Wrong port parameter");
+                this->server_port = num;
+                break;
+            case 's':
+                this->game_speed = num;
+                break;
+            case 't':
+                this->turn_speed = num;
+                break;
+            case 'r':
+                this->seed = num;
+                break;
+            default: /* '?' */
+                syserr("Usage: %s [-W n] [-H n] [-p n] [-s n] [-t n] [-r n]", argv[0]);
+        }
+    }
+}
+
+uint64_t Server::get_random()
+{
+    static int r = 0;
+    if (this->get_random_first_call) {
+        this->get_random_first_call = false;
+        return r = this->seed;
+    }
+    return r = ((uint64_t)r * 279470273) % 4294967291;
 }
 
 void Server::receive_datagram_from_client(unsigned char *datagram, int len, struct sockaddr_in &srvr_address, ssize_t &rcv_len)

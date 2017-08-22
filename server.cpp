@@ -99,6 +99,35 @@ void Event::create_event_player_eliminated(uint8_t player_number)
     this->event_data += make_message_from_n_byte(player_number, 1);
 }
 
+Client::Client(Server *server, struct sockaddr_in client_address, uint64_t session_id, std::string client_name, int8_t turn_direction, uint32_t next_expected_event_no)
+{
+    this->server = server;
+    this->client_address = client_address;
+    this->session_id = session_id;
+    this->client_name = client_name;
+    this->alive = false;
+    this->head_x = ((server->get_random())%server->map_width) + 0.5;
+    this->head_y = ((server->get_random())%server->map_height) + 0.5;
+    this->direction = (server->get_random())%360;
+    this->turn_direction = turn_direction;
+    this->next_expected_event_no = next_expected_event_no;
+}
+
+Game::Game(Server *server)
+{
+    this->game_id = server->get_random();
+    this->server = server;
+    this->is_game_active = false;
+}
+
+bool Game::check_is_game_over()
+{
+    uint32_t active_clients = 0;
+    for (size_t i = 0; i < server->clients.size(); ++i)
+        if (server->clients[i].alive)
+            ++active_clients;
+    return active_clients <= 1;
+}
 
 void Server::make_socket()
 {
@@ -147,6 +176,7 @@ Server::Server(int argc, char *argv[])
     this->seed = time(NULL);
     this->get_random_first_call = true;
     this->game_is_active = false;
+    this->last_time = this->get_time();
 
     int opt;
     while ((opt = getopt(argc, argv, "W:H:p:s:t:r:")) != -1) {
@@ -183,7 +213,7 @@ Server::Server(int argc, char *argv[])
 
 uint64_t Server::get_random()
 {
-    static int r = 0;
+    static uint32_t r = 0;
     if (this->get_random_first_call) {
         this->get_random_first_call = false;
         return r = this->seed;
@@ -217,11 +247,6 @@ void Server::send_datagram_to_client(struct sockaddr_in *client_address, unsigne
         syserr("error on sending datagram to client socket");
 }
 
-void Server::push_datagram(Datagram datagram)
-{
-    this->datagrams.push_back(datagram);
-}
-
 bool Server::read_datagrams()
 {
 
@@ -242,4 +267,23 @@ uint64_t Server::get_time()
     struct timeval tp;
     gettimeofday(&tp, NULL);
     return (uint64_t)tp.tv_sec*1000 + tp.tv_usec/1000;
+}
+
+int Server::find_index_of_client(struct sockaddr_in client_address, uint64_t session_id)
+{
+    for (size_t i = 0; i < (this->clients.size()); ++i) {
+        Client client = this->clients[i];
+        if (client.session_id == session_id && memcmp(&client.client_address, &client_address, sizeof(client_address)) == 0)
+            return i;
+    }
+    return -1;
+}
+
+bool Server::can_start_new_game()
+{
+    size_t ready_clients = 0;
+    for (size_t i = 0; i < this->clients.size(); ++i)
+        if (this->clients[i].client_name.size() > 0 && this->clients[i].turn_direction != 0)
+            ++ready_clients;
+    return ready_clients >= 2;
 }

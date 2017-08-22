@@ -64,12 +64,23 @@ numer partii (game_id), wysyłany w każdym wychodzącym datagramie,
    – zajęte piksele planszy.
    */
 
+class Server;
+
 class Client
 {
     public:
+        Server *server;
+        uint64_t session_id;
+        struct sockaddr_in client_address;
         double head_x;
         double head_y;
         double direction;
+        std::string client_name;
+        bool alive;
+        int8_t turn_direction;
+        uint32_t next_expected_event_no;
+
+        Client(Server *server, struct sockaddr_in, uint64_t session_id, std::string client_name, int8_t turn_direction, uint32_t next_expected_event_no);
 };
 
 class Game
@@ -80,39 +91,45 @@ class Game
         std::set<std::pair<uint32_t, uint32_t> > occupied_pixels;
 
     public:
-        std::vector<Client> clients;
+        Server *server;
+        bool is_game_active;
+
+        Game(Server *server);
+        bool check_is_game_over();
 };
 
 class Server
 {
     private:
         std::vector<Datagram> datagrams;
-        uint32_t map_width;
-        uint32_t map_height;
         uint16_t server_port;
         uint32_t game_speed;
         uint32_t turn_speed;
         uint32_t seed;
 
     public:
+        uint32_t map_width;
+        uint32_t map_height;
         int sock;
         uint64_t last_time;
         struct sockaddr_in server_address;
         bool get_random_first_call;
         bool game_is_active;
         uint64_t time_period;
-        Game game;
+        std::vector<Client> clients;
+        Game *game;
 
         Server(int argc, char *argv[]);
         void make_socket();
         void receive_datagram_from_client(unsigned char *datagram, int len, struct sockaddr_in &srvr_address, ssize_t &rcv_len);
         void send_datagram_to_client(struct sockaddr_in *client_address, unsigned char *datagram, int len);
-        void push_datagram(Datagram datagram);
         bool read_datagrams();
         void process_clients();
         void send_events_to_clients();
         uint64_t get_random();
         uint64_t get_time();
+        int find_index_of_client(struct sockaddr_in client_address, uint64_t session_id);
+        bool can_start_new_game();
 };
 
 

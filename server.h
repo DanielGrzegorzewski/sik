@@ -51,8 +51,8 @@ class Event
     public:
         Event(uint32_t event_type);
         void create_event_new_game(uint32_t maxx, uint32_t maxy, std::vector<std::string> &players_name);
-        void create_event_pixel(int8_t player_number, uint32_t x, uint32_t y);
-        void create_event_player_eliminated(int8_t player_number);
+        void create_event_pixel(uint8_t player_number, uint32_t x, uint32_t y);
+        void create_event_player_eliminated(uint8_t player_number);
 };
 
 /*
@@ -98,6 +98,7 @@ class Server
         int sock;
         struct sockaddr_in server_address;
         bool get_random_first_call;
+        bool game_is_active;
         Game game;
 
         Server(int argc, char *argv[]);

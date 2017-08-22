@@ -86,15 +86,14 @@ void Event::create_event_new_game(uint32_t maxx, uint32_t maxy, std::vector<std:
         this->event_data += str + '\0';
 }
 
-void Event::create_event_pixel(int8_t player_number, uint32_t x, uint32_t y)
+void Event::create_event_pixel(uint8_t player_number, uint32_t x, uint32_t y)
 {
-    //check bo signed
     this->event_data += make_message_from_n_byte(player_number, 1);
     this->event_data += make_message_from_n_byte(x, 4);
     this->event_data += make_message_from_n_byte(y, 4);
 }
 
-void Event::create_event_player_eliminated(int8_t player_number)
+void Event::create_event_player_eliminated(uint8_t player_number)
 {
     this->event_data += make_message_from_n_byte(player_number, 1);
 }
@@ -146,6 +145,7 @@ Server::Server(int argc, char *argv[])
     this->turn_speed = DEFAULT_TURN_SPEED;
     this->seed = time(NULL);
     this->get_random_first_call = true;
+    this->game_is_active = false;
 
     int opt;
     while ((opt = getopt(argc, argv, "W:H:p:s:t:r:")) != -1) {

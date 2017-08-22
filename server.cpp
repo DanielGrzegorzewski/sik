@@ -287,3 +287,10 @@ bool Server::can_start_new_game()
             ++ready_clients;
     return ready_clients >= 2;
 }
+
+void Server::start_new_game()
+{
+    for (size_t i = 0; i < this->clients.size(); ++i)
+        if (this->clients[i].client_name.size() > 0 && this->clients[i].turn_direction != 0)
+            this->clients[i].alive = true;
+}

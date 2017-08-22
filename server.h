@@ -130,6 +130,7 @@ class Server
         uint64_t get_time();
         int find_index_of_client(struct sockaddr_in client_address, uint64_t session_id);
         bool can_start_new_game();
+        void start_new_game();
 };
 
 

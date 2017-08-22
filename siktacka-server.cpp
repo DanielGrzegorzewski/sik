@@ -22,6 +22,7 @@ int main(int argc, char *argv[]) {
         if (!server.game_is_active && server.can_start_new_game()) {
             server.game_is_active = true;
             server.game = new Game(&server);
+            server.start_new_game();
         }
 
         if (server.game_is_active && server.get_time() - server.last_time > server.time_period) {

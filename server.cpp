@@ -2,6 +2,7 @@
 #include <iostream>
 #include <cstring>
 #include <unistd.h>
+#include <sys/time.h>
 
 #include "err.h"
 #include "server.h"
@@ -177,6 +178,7 @@ Server::Server(int argc, char *argv[])
                 syserr("Usage: %s [-W n] [-H n] [-p n] [-s n] [-t n] [-r n]", argv[0]);
         }
     }
+    this->time_period = 1000/(this->game_speed);
 }
 
 uint64_t Server::get_random()
@@ -218,4 +220,26 @@ void Server::send_datagram_to_client(struct sockaddr_in *client_address, unsigne
 void Server::push_datagram(Datagram datagram)
 {
     this->datagrams.push_back(datagram);
+}
+
+bool Server::read_datagrams()
+{
+
+}
+
+void Server::process_clients()
+{
+
+}
+
+void Server::send_events_to_clients()
+{
+
+}
+
+uint64_t Server::get_time()
+{
+    struct timeval tp;
+    gettimeofday(&tp, NULL);
+    return (uint64_t)tp.tv_sec*1000 + tp.tv_usec/1000;
 }

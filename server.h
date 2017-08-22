@@ -96,9 +96,11 @@ class Server
 
     public:
         int sock;
+        uint64_t last_time;
         struct sockaddr_in server_address;
         bool get_random_first_call;
         bool game_is_active;
+        uint64_t time_period;
         Game game;
 
         Server(int argc, char *argv[]);
@@ -106,7 +108,11 @@ class Server
         void receive_datagram_from_client(unsigned char *datagram, int len, struct sockaddr_in &srvr_address, ssize_t &rcv_len);
         void send_datagram_to_client(struct sockaddr_in *client_address, unsigned char *datagram, int len);
         void push_datagram(Datagram datagram);
+        bool read_datagrams();
+        void process_clients();
+        void send_events_to_clients();
         uint64_t get_random();
+        uint64_t get_time();
 };
 
 

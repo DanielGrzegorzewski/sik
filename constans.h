@@ -17,5 +17,6 @@ const int DEFAULT_MAP_WIDTH = 800;
 const int DEFAULT_MAP_HEIGHT = 600;
 const int DEFAULT_GAME_SPEED = 50;
 const int DEFAULT_TURN_SPEED = 6;
+const int SERVER_BUFFER_SIZE = 100;
 
 #endif

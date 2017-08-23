@@ -83,6 +83,8 @@ class Client
         Client(Server *server, struct sockaddr_in, uint64_t session_id, std::string client_name, int8_t turn_direction, uint32_t next_expected_event_no);
 };
 
+bool cmp(Client &client1, Client &client2);
+
 class Game
 {
     private:
@@ -121,13 +123,15 @@ class Server
 
         Server(int argc, char *argv[]);
         void make_socket();
-        void receive_datagram_from_client(unsigned char *datagram, int len, struct sockaddr_in &srvr_address, ssize_t &rcv_len);
+        ssize_t receive_datagram_from_client(unsigned char *datagram, int len, struct sockaddr_in &srvr_address, ssize_t &rcv_len);
         void send_datagram_to_client(struct sockaddr_in *client_address, unsigned char *datagram, int len);
-        bool read_datagrams();
+        void read_datagrams();
+        void process_client();
         void process_clients();
         void send_events_to_clients();
         uint64_t get_random();
         uint64_t get_time();
+        void add_client(Client client);
         int find_index_of_client(struct sockaddr_in client_address, uint64_t session_id);
         bool can_start_new_game();
         void start_new_game();

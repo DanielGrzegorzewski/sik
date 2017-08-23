@@ -3,6 +3,7 @@
 #include <cstring>
 #include <unistd.h>
 #include <sys/time.h>
+#include <algorithm>
 
 #include "err.h"
 #include "server.h"
@@ -113,6 +114,11 @@ Client::Client(Server *server, struct sockaddr_in client_address, uint64_t sessi
     this->next_expected_event_no = next_expected_event_no;
 }
 
+bool cmp(Client &client1, Client &client2)
+{
+    return client1.client_name < client2.client_name;
+}
+
 Game::Game(Server *server)
 {
     this->game_id = server->get_random();
@@ -221,17 +227,18 @@ uint64_t Server::get_random()
     return r = ((uint64_t)r * 279470273) % 4294967291;
 }
 
-void Server::receive_datagram_from_client(unsigned char *datagram, int len, struct sockaddr_in &srvr_address, ssize_t &rcv_len)
+ssize_t Server::receive_datagram_from_client(unsigned char *datagram, int len, struct sockaddr_in &srvr_address, ssize_t &rcv_len)
 {
-    int flags = 0;
+    int flags = MSG_DONTWAIT;
     socklen_t rcva_len;
 
     memset(datagram, 0, sizeof(datagram));
     rcva_len = (socklen_t) sizeof(srvr_address);
     rcv_len = recvfrom(this->sock, datagram, len, flags,
         (struct sockaddr *) &srvr_address, &rcva_len);
-    if (rcv_len < 0)
-        syserr("error on datagram from client socket");
+    return rcv_len;
+    //if (rcv_len < 0)
+    //    syserr("error on datagram from client socket");
 }
 
 void Server::send_datagram_to_client(struct sockaddr_in *client_address, unsigned char *datagram, int len)
@@ -247,19 +254,51 @@ void Server::send_datagram_to_client(struct sockaddr_in *client_address, unsigne
         syserr("error on sending datagram to client socket");
 }
 
-bool Server::read_datagrams()
+void Server::read_datagrams()
 {
+    unsigned char buffer[SERVER_BUFFER_SIZE];
+    struct sockaddr_in client_address;
+    ssize_t len = 0;
 
+    while (len > -1) {
+        len = this->receive_datagram_from_client(buffer, (size_t)sizeof(buffer), client_address, len);
+        // TODO dodaj sprawdzanie itd no bo lol
+        Datagram datagram(buffer, len);
+        int ind = this->find_index_of_client(client_address, datagram.session_id);
+        if (ind == -1) {
+            Client client(this, client_address, datagram.session_id, datagram.player_name, datagram.turn_direction, datagram.next_expected_event_no);
+            this->add_client(client);
+        }
+        else {
+            this->clients[ind].turn_direction = datagram.turn_direction;
+            this->clients[ind].next_expected_event_no = datagram.next_expected_event_no;
+        }
+    }
+}
+
+void Server::process_client(int ind)
+{
+    this->clients[ind].direction += this->clients[ind].direction * this->clients[ind].turn_direction;
+    this->clients[ind].direction = ((this->clients[ind].direction%360) + 360)%360;
+    this->
 }
 
 void Server::process_clients()
 {
-
+    for (size_t i = 0; i < this->clients.size(); ++i)
+        if (this->clients[i].alive)
+            process_client(i);
 }
 
 void Server::send_events_to_clients()
 {
 
+}
+
+void Server::add_client(Client client)
+{
+    this->clients.push_back(client);
+    sort(this->clients.begin(), this->clients.end(), cmp);
 }
 
 uint64_t Server::get_time()

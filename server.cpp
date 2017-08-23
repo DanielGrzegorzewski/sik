@@ -4,6 +4,8 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <algorithm>
+#include <cmath>
+#include <fcntl.h>
 
 #include "err.h"
 #include "server.h"
@@ -71,7 +73,26 @@ bool parse_datagram(unsigned char *datagram, uint32_t len, uint64_t &session_id,
 
 Datagram::Datagram(unsigned char *buffer, size_t len)
 {
-    parse_datagram(buffer, len, this->session_id, this->turn_direction, this->next_expected_event_no, this->player_name);
+    this->correct_datagram = parse_datagram(buffer, len, this->session_id, this->turn_direction, this->next_expected_event_no, this->player_name);
+}
+
+uint32_t calculate_crc32(std::string str) {
+   int i, j;
+   unsigned int byte, crc, mask;
+   int len = str.size();
+
+   i = 0;
+   crc = 0xFFFFFFFF;
+   while (i < len) {
+      byte = str[i];
+      crc = crc ^ byte;
+      for (j = 7; j >= 0; j--) {
+         mask = -(crc & 1);
+         crc = (crc >> 1) ^ (0xEDB88320 & mask);
+      }
+      i = i + 1;
+   }
+   return ~crc;
 }
 
 Event::Event(uint32_t event_type)
@@ -98,6 +119,17 @@ void Event::create_event_pixel(uint8_t player_number, uint32_t x, uint32_t y)
 void Event::create_event_player_eliminated(uint8_t player_number)
 {
     this->event_data += make_message_from_n_byte(player_number, 1);
+}
+
+std::string Event::to_string(uint32_t event_number)
+{
+    std::string result = "";
+    result += make_message_from_n_byte(event_number, 4);
+    result += make_message_from_n_byte(this->event_type, 1);
+    result += this->event_data;
+    result = make_message_from_n_byte(result.size(), 4) + result;
+    result += make_message_from_n_byte(calculate_crc32(result), 4);
+    return result;
 }
 
 Client::Client(Server *server, struct sockaddr_in client_address, uint64_t session_id, std::string client_name, int8_t turn_direction, uint32_t next_expected_event_no)
@@ -130,7 +162,7 @@ bool Game::check_is_game_over()
 {
     uint32_t active_clients = 0;
     for (size_t i = 0; i < server->clients.size(); ++i)
-        if (server->clients[i].alive)
+        if (this->server->clients[i].alive)
             ++active_clients;
     return active_clients <= 1;
 }
@@ -148,6 +180,8 @@ void Server::make_socket()
     if (bind(this->sock, (struct sockaddr *) &(this->server_address),
             (socklen_t) sizeof(server_address)) < 0)
         syserr("bind");
+
+    fcntl(sock, F_SETFL, O_NONBLOCK);
 }
 
 // Konwertuje ciag znakow na liczbe jezeli owa jest liczba
@@ -229,7 +263,7 @@ uint64_t Server::get_random()
 
 ssize_t Server::receive_datagram_from_client(unsigned char *datagram, int len, struct sockaddr_in &srvr_address, ssize_t &rcv_len)
 {
-    int flags = MSG_DONTWAIT;
+    int flags = 0;
     socklen_t rcva_len;
 
     memset(datagram, 0, sizeof(datagram));
@@ -262,8 +296,9 @@ void Server::read_datagrams()
 
     while (len > -1) {
         len = this->receive_datagram_from_client(buffer, (size_t)sizeof(buffer), client_address, len);
-        // TODO dodaj sprawdzanie itd no bo lol
         Datagram datagram(buffer, len);
+        if (!datagram.correct_datagram)
+            continue;
         int ind = this->find_index_of_client(client_address, datagram.session_id);
         if (ind == -1) {
             Client client(this, client_address, datagram.session_id, datagram.player_name, datagram.turn_direction, datagram.next_expected_event_no);
@@ -276,11 +311,49 @@ void Server::read_datagrams()
     }
 }
 
+int Server::client_index_from_alives(int ind)
+{
+    int result = 0;
+    for (int i = 0; i < ind; ++i)
+        if (this->clients[i].alive)
+            ++result;
+    return result;
+}
+
+bool Server::check_collision(int x, int y)
+{
+    if (x < 0 || y < 0 || x >= this->map_width || y >= this->map_height)
+        return true;
+    if (this->game->occupied_pixels.find(std::make_pair(x, y)) != this->game->occupied_pixels.end())
+        return true;
+    return false;
+}
+
 void Server::process_client(int ind)
 {
     this->clients[ind].direction += this->clients[ind].direction * this->clients[ind].turn_direction;
     this->clients[ind].direction = ((this->clients[ind].direction%360) + 360)%360;
-    this->
+    int last_x = (int)this->clients[ind].head_x;
+    int last_y = (int)this->clients[ind].head_y;
+    this->clients[ind].head_x += sin(-this->clients[ind].head_x);
+    this->clients[ind].head_y += cos(-this->clients[ind].head_y);
+    int new_x = (int)this->clients[ind].head_x;
+    int new_y = (int)this->clients[ind].head_y;
+    
+    if (new_x == last_x && new_y == last_y)
+        return;
+    if (check_collision(new_x, new_y)) {
+        this->clients[ind].alive = false;
+        Event event(2);
+        event.create_event_player_eliminated(client_index_from_alives(ind));
+        this->events.push_back(event);
+        return;
+    }
+    
+    this->game->occupied_pixels.insert(std::make_pair(new_x, new_y));
+    Event event(1);
+    event.create_event_pixel(client_index_from_alives(ind), new_x, new_y);
+    this->events.push_back(event);
 }
 
 void Server::process_clients()
@@ -290,9 +363,32 @@ void Server::process_clients()
             process_client(i);
 }
 
+void Server::send_events_to_client(int ind)
+{
+    int from = ind;
+    int to = this->events.size();
+    for (int i = from; i < to; ++i) {
+        unsigned char message[MESSAGE_FROM_SERVER_MAX_SIZE];
+        std::string game_id_str = make_message_from_n_byte(this->game->game_id, 4);
+        int cur_ptr;
+        for (cur_ptr = 0; cur_ptr < 4; ++cur_ptr)
+            message[cur_ptr] = game_id_str[cur_ptr];
+        while (cur_ptr + this->events[i].to_string(i).size() < MESSAGE_FROM_SERVER_MAX_SIZE) {
+            std::string event_str = this->events[i].to_string(i);
+            for (int j = 0; j < event_str.size(); ++j)
+                message[cur_ptr++] = event_str[j];
+            ++i;
+        }
+        --i;
+        this->send_datagram_to_client(&this->clients[i].client_address, message, cur_ptr);
+    }
+}
+
 void Server::send_events_to_clients()
 {
-
+    for (size_t i = 0; i < this->clients.size(); ++i)
+        if (this->clients[i].next_expected_event_no < this->events.size())
+            send_events_to_client(i);
 }
 
 void Server::add_client(Client client)
@@ -329,7 +425,15 @@ bool Server::can_start_new_game()
 
 void Server::start_new_game()
 {
+    std::vector<std::string> players_name;
+
     for (size_t i = 0; i < this->clients.size(); ++i)
-        if (this->clients[i].client_name.size() > 0 && this->clients[i].turn_direction != 0)
+        if (this->clients[i].client_name.size() > 0 && this->clients[i].turn_direction != 0) {
             this->clients[i].alive = true;
+            players_name.push_back(this->clients[i].client_name);
+        }
+
+    Event event(0);
+    event.create_event_new_game(this->map_width, this->map_height, players_name);
+    this->events.push_back(event);
 }

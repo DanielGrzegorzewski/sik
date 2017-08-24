@@ -1,0 +1,22 @@
+Zmodyfikuj klienta w ten sposób, aby przyjmował dwa dodatkowe parametry:
+nazwę pliku oraz rozmiar porcji danych (k). Klient otwiera plik (open),
+a następnie w pętli odczytuje porcje po k bajtów z pliku (read) i przesyła je
+do serwera (write).
+
+Zmodyfikuj serwer w ten sposób, aby czytał w pętli komunikaty od klienta (read).
+Po otrzymaniu danych serwer wypisuje na standardowe wyjście liczbę otrzymanych 
+bajtów. Serwer może być wywołany bez parametrów lub z jednym parametrem,
+który jest nazwą pliku. Jeśli serwer został wywołany z parametrem, to dopisuje 
+dane do pliku o podanej nazwie (write), w przeciwnym przypadku porzuca dane.
+
+Przetestuj różne wartości k (np. 10, 100, 1000, 5000) dla pliku przeczytaj-mnie.
+Zaobserwuj, jak wartości wypisywane przez serwer zależą od parametru klienta.
+Uruchom klienta i serwer na dwóch różnych maszynach.
+
+UWAGI:
+Rozwiązania można prezentować tylko w trakcie zajęć 4-6.04.2017.
+Zadanie warte jest 0,3 punktu.
+
+Dla chętnych: rozszerz swoje programy w ten sposób, aby klient przesyłał
+na początku nazwę pliku do serwera, a serwer zapisywał dane do pliku o podanej
+nazwie z dodanym prefiksem "copy-".

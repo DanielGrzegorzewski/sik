@@ -358,6 +358,7 @@ void Server::process_client(int ind)
 
 void Server::process_clients()
 {
+    this->last_time = this->get_time();
     for (size_t i = 0; i < this->clients.size(); ++i)
         if (this->clients[i].alive)
             process_client(i);
@@ -427,6 +428,9 @@ void Server::start_new_game()
 {
     std::vector<std::string> players_name;
 
+    this->game_is_active = true;
+    this->game = new Game(this);
+    
     for (size_t i = 0; i < this->clients.size(); ++i)
         if (this->clients[i].client_name.size() > 0 && this->clients[i].turn_direction != 0) {
             this->clients[i].alive = true;
@@ -435,5 +439,24 @@ void Server::start_new_game()
 
     Event event(0);
     event.create_event_new_game(this->map_width, this->map_height, players_name);
+    this->events.push_back(event);
+}
+
+bool Server::time_to_next_round_elapsed()
+{
+    return this->game_is_active && ((this->get_time() - this->last_time) > this->time_period);
+}
+
+void Server::close_socket()
+{
+    if (close(this->sock) == -1) 
+        syserr("close");
+}
+
+void Server::game_over()
+{
+    delete this->game;
+    this->game_is_active = false;
+    Event event(3);
     this->events.push_back(event);
 }

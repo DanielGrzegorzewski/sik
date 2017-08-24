@@ -1,6 +1,8 @@
 #ifndef _PLAYER_H_
 #define _PLAYER_H_
 
+#include <vector>
+
 class Player
 {
     private:
@@ -15,13 +17,23 @@ class Player
 
     public:
         int sock;
-        struct addrinfo addr_hints;
+        int sock_gui;
+        uint64_t last_time;
         struct sockaddr_in server_address;
+        std::vector<std::string> events_from_server;
 
         Player(int argc, char *argv[]);
         void make_socket();
+        void make_gui_socket();
         std::string make_datagram();
         void send_player_datagram();
+        void receive_from_server();
+        void receive_from_gui();
+        void send_to_gui();
+        uint64_t get_time();
+        bool time_to_next_round_elapsed();
+        void close_socket();
+        void close_gui_socket();
 };
 
 #endif

@@ -1,12 +1,9 @@
 #include <netdb.h>
+#include <unistd.h>
 #include <iostream>
 
 #include "server.h"
-
-#define BUFFER_SIZE   100
-
-unsigned char buffer[BUFFER_SIZE];
-ssize_t len;
+#include "err.h"
 
 int main(int argc, char *argv[]) {
 
@@ -16,24 +13,17 @@ int main(int argc, char *argv[]) {
     while (true) {
         server.read_datagrams();
 
-        if (!server.game_is_active && server.can_start_new_game()) {
-            server.game_is_active = true;
-            server.game = new Game(&server);
+        if (!server.game_is_active && server.can_start_new_game())
             server.start_new_game();
-        }
 
-        if (server.game_is_active && server.get_time() - server.last_time > server.time_period) {
-            server.last_time = server.get_time();
+        if (server.time_to_next_round_elapsed()) {
             server.process_clients();
-            if (server.game->check_is_game_over()) {
-                delete server.game;
-                server.game_is_active = false;
-                Event event(3);
-                server.events.push_back(event);
-            }
+            if (server.game->check_is_game_over())
+                server.game_over();
             server.send_events_to_clients();
         }
     }
 
+    server.close_socket();
     return 0;
 }

@@ -105,6 +105,9 @@ class Server
         int find_index_of_client(struct sockaddr_in client_address, uint64_t session_id);
         bool can_start_new_game();
         void start_new_game();
+        bool time_to_next_round_elapsed();
+        void close_socket();
+        void game_over();
 };
 
 

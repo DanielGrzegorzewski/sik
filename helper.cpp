@@ -20,7 +20,7 @@ void send_datagram(Player *player, unsigned char *datagram, int len)
         syserr("partial / failed write");
 }
 
-void receive_datagram(Player *player, unsigned char *datagram, int len)
+ssize_t receive_datagram(Player *player, unsigned char *datagram, int len)
 {
     int flags = 0;
     socklen_t rcva_len;
@@ -32,6 +32,7 @@ void receive_datagram(Player *player, unsigned char *datagram, int len)
         (struct sockaddr *) &srvr_address, &rcva_len);
     if (rcv_len < 0)
         syserr("read");
+    return rcv_len;
 }
 
 unsigned long long read_time(unsigned  char* buffer)

@@ -5,7 +5,7 @@
 
 void send_datagram(Player *player, unsigned char *datagram, int len);
 
-void receive_datagram(Player *player, unsigned char *datagram, int len);
+ssize_t receive_datagram(Player *player, unsigned char *datagram, int len);
 
 unsigned char make_char(unsigned long long my_time, int from, int to);
 

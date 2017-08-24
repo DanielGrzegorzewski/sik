@@ -30,6 +30,7 @@ class Player
         void receive_from_server();
         void receive_from_gui();
         void send_to_gui();
+        void process_event(std::string event);
         uint64_t get_time();
         bool time_to_next_round_elapsed();
         void close_socket();

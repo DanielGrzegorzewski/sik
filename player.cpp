@@ -151,11 +151,36 @@ void Player::receive_from_gui()
     }
 }
 
+std::string get_event(std::string events, int ind)
+{
+    unsigned char event_len_str[4];
+    for (int i = 0; i < 4; ++i)
+        event_len_str[i] = events[ind+i];
+    uint32_t len = read_4_byte_number(event_len_str);
+    std::string event = "";
+    for (int i = 4; i < 4+len+4; ++i)
+        event += events[ind+i];
+    return event;
+}
+
+void Player::process_event(std::string event)
+{
+
+}
+
 void Player::send_to_gui()
 {
     for (size_t i = 0; i < this->events_from_server.size(); ++i) {
-        std::string event = this->events_from_server[i];
-        uint32_t game_id = 
+        std::string events = this->events_from_server[i];
+        unsigned char game_id_str[4];
+        for (int j = 0; j < 4; ++j)
+            game_id_str[j] = events[j];
+        uint32_t game_id = read_4_byte_number(game_id_str);
+        for (size_t j = 4; j < events.size(); ++j) {
+            std::string event = get_event(events, j);
+            process_event(event);
+            j += event.size()-1;
+        }
     }
     this->events_from_server.clear();
 }

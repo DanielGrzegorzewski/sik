@@ -12,28 +12,6 @@
 #include "constans.h"
 #include "helper.h"
 
-uint64_t read_8_byte_number(unsigned char *buffer)
-{
-    uint64_t result = 0;
-    for (size_t i = 0; i < 8; ++i)
-        result += buffer[i]*(1LL<<(8*(7-i)));
-    return result;
-}
-
-int8_t read_1_byte_number(unsigned char *buffer)
-{
-    int8_t result = buffer[0];
-    return result;
-}
-
-uint32_t read_4_byte_number(unsigned char *buffer)
-{
-    uint32_t result = 0;
-    for (size_t i = 0; i < 4; ++i)
-        result += buffer[i]*(1LL<<(8*(3-i)));
-    return result;
-}
-
 std::string get_string_from_datagram(unsigned char *datagram, uint8_t from, uint8_t to)
 {
     std::string result_string = "";

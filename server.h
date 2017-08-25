@@ -93,10 +93,10 @@ class Server
         ssize_t receive_datagram_from_client(unsigned char *datagram, int len, struct sockaddr_in &srvr_address, ssize_t &rcv_len);
         void send_datagram_to_client(struct sockaddr_in *client_address, unsigned char *datagram, int len);
         void read_datagrams();
+        void send_event(int event_id);
         void process_client(int ind);
         void process_clients();
         void send_events_to_client(int ind);
-        void send_events_to_clients();
         uint64_t get_random();
         uint64_t get_time();
         bool check_collision(int x, int y);

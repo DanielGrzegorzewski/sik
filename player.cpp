@@ -3,6 +3,7 @@
 #include <iostream>
 #include <cstring>
 #include <unistd.h>
+#include <fcntl.h>
 
 #include "player.h"
 #include "parser.h"
@@ -23,6 +24,8 @@ Player::Player(int argc, char **argv)
     this->turn_direction = 0;
     this->next_expected_event_no = 0;
     this->last_time = this->get_time();
+    this->left_push = false;
+    this->right_push = false;
 }
 
 std::string Player::make_datagram()
@@ -74,6 +77,8 @@ void Player::make_socket()
     this->sock = socket(PF_INET, SOCK_DGRAM, 0);
     if (this->sock < 0)
         syserr("socket");
+
+    fcntl(this->sock, F_SETFL, O_NONBLOCK);
 }
 
 void Player::make_gui_socket()
@@ -97,6 +102,8 @@ void Player::make_gui_socket()
         syserr("connect");
 
     freeaddrinfo(addr_result);
+
+    fcntl(this->sock_gui, F_SETFL, O_NONBLOCK);
 }
 
 uint64_t Player::get_time()
@@ -109,17 +116,18 @@ uint64_t Player::get_time()
 void Player::receive_from_server()
 {
     unsigned char buffer[555];
-    ssize_t len = receive_datagram(this, buffer, (size_t)(sizeof(buffer) - 1));
-    if (len < 0)
-        syserr("receive from server");
+    //std::cout<<"11\n";
+    ssize_t len = receive_datagram(this, buffer, sizeof(buffer)-1);
+    //std::cout<<"22\n";
     while (len > 0) {
+        //std::cout<<"k\n";
         std::string event = "";
         for (int i = 0; i < len; ++i)
             event += buffer[i];
         this->events_from_server.push_back(event);
-        len = receive_datagram(this, buffer, (size_t)(sizeof(buffer) - 1));
-        if (len < 0)
-            syserr("receive from server");
+        //std::cout<<"Probuje pobrac\n";
+        len = receive_datagram(this, buffer, sizeof(buffer)-1);
+        //std::cout<<"Pobrane\n";
     }
 }
 
@@ -133,18 +141,20 @@ void Player::receive_from_gui()
         std::string message = "";
         for (int i = 0; i < rcv_len; ++i)
             message += buffer[i];
-        if (message == "LEFT_KEY_DOWN") {
-
-        }
-        else if (message == "LEFT_KEY_UP") {
-
-        }
-        else if (message == "RIGHT_KEY_DOWN") {
-
-        }
-        else if (message == "RIGHT_KEY_UP") {
-
-        }
+        if (message == "LEFT_KEY_DOWN")
+            this->left_push = true;
+        else if (message == "LEFT_KEY_UP")
+            this->left_push = false;
+        else if (message == "RIGHT_KEY_DOWN")
+            this->right_push = true;
+        else if (message == "RIGHT_KEY_UP")
+            this->right_push = false;
+        if (this->left_push && !this->right_push)
+            this->turn_direction = -1;
+        else if (!this->left_push && this->right_push)
+            this->turn_direction = 1;
+        else
+            this->turn_direction = 0;
         rcv_len = read(this->sock_gui, buffer, sizeof(buffer) - 1);
         if (rcv_len < 0)
             syserr("receive from gui");
@@ -157,28 +167,114 @@ std::string get_event(std::string events, int ind)
     for (int i = 0; i < 4; ++i)
         event_len_str[i] = events[ind+i];
     uint32_t len = read_4_byte_number(event_len_str);
+    std::cout<<"wcz len = "<<len<<"\n";
     std::string event = "";
-    for (int i = 4; i < 4+len+4; ++i)
+    for (int i = 0; i < 4+len+4; ++i)
         event += events[ind+i];
     return event;
 }
 
-void Player::process_event(std::string event)
+uint32_t get_4_byte_number(std::string str, int from)
 {
+    unsigned char number_str[4];
+    for (size_t i = 0; i < 4; ++i)
+        number_str[i] = str[from+i];
+    return read_4_byte_number(number_str);
+}
 
+int8_t get_1_byte_number(std::string str, int from)
+{
+    unsigned char number_str[1];
+    number_str[0] = str[from];
+    return read_1_byte_number(number_str);
+}
+
+bool Player::process_event(std::string event)
+{
+    std::cout<<"caly ev = "<<event.size()<<"\n";
+    uint32_t len = get_4_byte_number(event, 0);
+    uint32_t event_no = get_4_byte_number(event, 4);
+    int8_t event_type = get_1_byte_number(event, 8);
+    uint32_t crc = get_4_byte_number(event, 4+len);
+    std::cout<<"event len = "<<len<<"\n";
+    std::string crc_str = "";
+    for (int i = 4; i < 4+len; ++i)
+        crc_str += event[i];
+    if (crc != calculate_crc32(crc_str) || event_no != this->next_expected_event_no)
+        return false;
+
+    if (event_type == 0) {
+        uint32_t map_width = get_4_byte_number(event, 9);
+        uint32_t map_height = get_4_byte_number(event, 13);
+        std::string message = "NEW GAME " + std::to_string(map_width) + " " + std::to_string(map_height);
+        int ind = 17;
+        while (ind < 4+len) {
+            message += " ";
+            std::string name = "";
+            while (ind < 4+len && event[ind] != '\0')
+                name += event[ind++];
+            this->players_name.push_back(name);
+            message += name;
+            ++ind;
+        }
+        ++this->next_expected_event_no;
+        std::cout<<"Wysylam: \n"<<message<<"\n";
+        //write(this->sock_gui, message.c_str(), message.size());
+        return true;
+    }
+    else if (event_type == 1) {
+        int8_t player_number = get_1_byte_number(event, 9);
+        uint32_t player_x = get_4_byte_number(event, 10);
+        uint32_t player_y = get_4_byte_number(event, 14);
+        std::string message = "PIXEL ";
+        message += std::to_string(player_x);
+        message += " " + std::to_string(player_y);
+        message += " " + this->players_name[player_number];
+        ++this->next_expected_event_no;
+        std::cout<<"Wysylam: \n"<<message<<"\n";
+        //write(this->sock_gui, message.c_str(), message.size());
+        return true;
+    }
+    else if (event_type == 2) {
+        int8_t player_number = get_1_byte_number(event, 9);
+        std::string message = "PLAYER_ELIMINATED ";
+        message += this->players_name[player_number];
+        ++this->next_expected_event_no;
+        std::cout<<"Wysylam: \n"<<message<<"\n";
+        //write(this->sock_gui, message.c_str(), message.size());
+        return true;
+    }
+    else if (event_type == 3) {
+        std::string message = "GAME OVER";
+        std::cout<<"Wysylam: \n"<<message<<"\n";
+        ++this->next_expected_event_no;
+        //write(this->sock_gui, message.c_str(), message.size());
+        return true;
+    }
+    else {
+        std::cout<<"Wysylam: cosniedziala\n";
+        return false;
+    }
+
+    return true;
 }
 
 void Player::send_to_gui()
 {
     for (size_t i = 0; i < this->events_from_server.size(); ++i) {
+        std::cout<<"noelo\n";
         std::string events = this->events_from_server[i];
         unsigned char game_id_str[4];
         for (int j = 0; j < 4; ++j)
             game_id_str[j] = events[j];
         uint32_t game_id = read_4_byte_number(game_id_str);
+        std::cout<<"event size = "<<events.size()<<", game_id = "<<game_id<<"\n";
         for (size_t j = 4; j < events.size(); ++j) {
             std::string event = get_event(events, j);
-            process_event(event);
+            std::cout<<"siz = "<<event.size()<<"\n";
+            bool event_res = process_event(event);
+            if (!event_res)
+                break;
             j += event.size()-1;
         }
     }

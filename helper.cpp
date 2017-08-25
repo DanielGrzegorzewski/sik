@@ -30,8 +30,6 @@ ssize_t receive_datagram(Player *player, unsigned char *datagram, int len)
     memset(datagram, 0, sizeof(datagram));
     rcv_len = recvfrom(player->sock, datagram, len, flags,
         (struct sockaddr *) &srvr_address, &rcva_len);
-    if (rcv_len < 0)
-        syserr("read");
     return rcv_len;
 }
 
@@ -83,4 +81,23 @@ unsigned char make_char(unsigned long long my_time, int from, int to)
         if (my_time&(1LL<<i))
             result += (1<<(i-from));
     return result;
+}
+
+uint32_t calculate_crc32(std::string str) {
+   int i, j;
+   unsigned int byte, crc, mask;
+   int len = str.size();
+
+   i = 0;
+   crc = 0xFFFFFFFF;
+   while (i < len) {
+      byte = str[i];
+      crc = crc ^ byte;
+      for (j = 7; j >= 0; j--) {
+         mask = -(crc & 1);
+         crc = (crc >> 1) ^ (0xEDB88320 & mask);
+      }
+      i = i + 1;
+   }
+   return ~crc;
 }

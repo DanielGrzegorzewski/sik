@@ -20,4 +20,6 @@ const int DEFAULT_TURN_SPEED = 6;
 const int SERVER_BUFFER_SIZE = 100;
 const int MESSAGE_FROM_SERVER_MAX_SIZE = 512;
 
+const double PI = 3.14159265359;
+
 #endif

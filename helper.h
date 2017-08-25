@@ -19,4 +19,6 @@ uint64_t read_8_byte_number(unsigned char *buffer);
 
 std::string make_message_from_n_byte(uint64_t timestamp, uint8_t n);
 
+uint32_t calculate_crc32(std::string str);
+
 #endif

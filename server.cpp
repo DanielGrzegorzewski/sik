@@ -54,25 +54,6 @@ Datagram::Datagram(unsigned char *buffer, size_t len)
     this->correct_datagram = parse_datagram(buffer, len, this->session_id, this->turn_direction, this->next_expected_event_no, this->player_name);
 }
 
-uint32_t calculate_crc32(std::string str) {
-   int i, j;
-   unsigned int byte, crc, mask;
-   int len = str.size();
-
-   i = 0;
-   crc = 0xFFFFFFFF;
-   while (i < len) {
-      byte = str[i];
-      crc = crc ^ byte;
-      for (j = 7; j >= 0; j--) {
-         mask = -(crc & 1);
-         crc = (crc >> 1) ^ (0xEDB88320 & mask);
-      }
-      i = i + 1;
-   }
-   return ~crc;
-}
-
 Event::Event(uint32_t event_type)
 {
     this->event_type = event_type;
@@ -105,8 +86,9 @@ std::string Event::to_string(uint32_t event_number)
     result += make_message_from_n_byte(event_number, 4);
     result += make_message_from_n_byte(this->event_type, 1);
     result += this->event_data;
+    uint32_t crc = calculate_crc32(result);
     result = make_message_from_n_byte(result.size(), 4) + result;
-    result += make_message_from_n_byte(calculate_crc32(result), 4);
+    result += make_message_from_n_byte(crc, 4);
     return result;
 }
 
@@ -142,7 +124,7 @@ bool Game::check_is_game_over()
     for (size_t i = 0; i < server->clients.size(); ++i)
         if (this->server->clients[i].alive)
             ++active_clients;
-    return active_clients <= 1;
+    return active_clients <= 0;
 }
 
 void Server::make_socket()
@@ -260,8 +242,10 @@ void Server::send_datagram_to_client(struct sockaddr_in *client_address, unsigne
     ssize_t snd_len;
 
     snda_len = (socklen_t) sizeof(*client_address);
+    std::cout<<"len = "<<len<<"\n";
     snd_len = sendto(this->sock, datagram, (size_t) len, sflags,
             (struct sockaddr *) client_address, snda_len);
+    std::cout<<"snd_len "<<snd_len<<", len = "<<len<<"\n";
     if (snd_len != len)
         syserr("error on sending datagram to client socket");
 }
@@ -281,11 +265,13 @@ void Server::read_datagrams()
         if (ind == -1) {
             Client client(this, client_address, datagram.session_id, datagram.player_name, datagram.turn_direction, datagram.next_expected_event_no);
             this->add_client(client);
+            ind = this->find_index_of_client(client_address, datagram.session_id);
         }
         else {
             this->clients[ind].turn_direction = datagram.turn_direction;
             this->clients[ind].next_expected_event_no = datagram.next_expected_event_no;
         }
+        this->send_events_to_client(ind);
     }
 }
 
@@ -307,14 +293,30 @@ bool Server::check_collision(int x, int y)
     return false;
 }
 
+void Server::send_event(int event_id) 
+{
+    unsigned char message[MESSAGE_FROM_SERVER_MAX_SIZE];
+    std::string game_id_str = make_message_from_n_byte(this->game->game_id, 4);
+    int cur_ptr, client_id;
+    for (client_id = 0; client_id < this->clients.size(); ++client_id) {
+        for (cur_ptr = 0; cur_ptr < 4; ++cur_ptr)
+            message[cur_ptr] = game_id_str[cur_ptr];
+        std::string event_str = this->events[event_id].to_string(event_id);
+        for (int j = 0; j < event_str.size(); ++j)
+            message[cur_ptr++] = event_str[j];
+        std::cout<<"Wysylam event o len = "<<cur_ptr<<"\n";
+        this->send_datagram_to_client(&this->clients[client_id].client_address, message, cur_ptr);
+    }
+}
+
 void Server::process_client(int ind)
 {
     this->clients[ind].direction += this->clients[ind].direction * this->clients[ind].turn_direction;
     this->clients[ind].direction = ((this->clients[ind].direction%360) + 360)%360;
     int last_x = (int)this->clients[ind].head_x;
     int last_y = (int)this->clients[ind].head_y;
-    this->clients[ind].head_x += sin(-this->clients[ind].head_x);
-    this->clients[ind].head_y += cos(-this->clients[ind].head_y);
+    this->clients[ind].head_x += sin((-1)*this->clients[ind].head_x/(2*PI));
+    this->clients[ind].head_y += cos((-1)*this->clients[ind].head_y/(2*PI));
     int new_x = (int)this->clients[ind].head_x;
     int new_y = (int)this->clients[ind].head_y;
     
@@ -325,6 +327,7 @@ void Server::process_client(int ind)
         Event event(2);
         event.create_event_player_eliminated(client_index_from_alives(ind));
         this->events.push_back(event);
+        send_event(this->events.size()-1);
         return;
     }
     
@@ -332,6 +335,7 @@ void Server::process_client(int ind)
     Event event(1);
     event.create_event_pixel(client_index_from_alives(ind), new_x, new_y);
     this->events.push_back(event);
+    send_event(this->events.size()-1);
 }
 
 void Server::process_clients()
@@ -344,7 +348,7 @@ void Server::process_clients()
 
 void Server::send_events_to_client(int ind)
 {
-    int from = ind;
+    int from = this->clients[ind].next_expected_event_no;
     int to = this->events.size();
     for (int i = from; i < to; ++i) {
         unsigned char message[MESSAGE_FROM_SERVER_MAX_SIZE];
@@ -352,22 +356,20 @@ void Server::send_events_to_client(int ind)
         int cur_ptr;
         for (cur_ptr = 0; cur_ptr < 4; ++cur_ptr)
             message[cur_ptr] = game_id_str[cur_ptr];
-        while (cur_ptr + this->events[i].to_string(i).size() < MESSAGE_FROM_SERVER_MAX_SIZE) {
+        while (i < to && cur_ptr + this->events[i].to_string(i).size() < MESSAGE_FROM_SERVER_MAX_SIZE) {
             std::string event_str = this->events[i].to_string(i);
             for (int j = 0; j < event_str.size(); ++j)
                 message[cur_ptr++] = event_str[j];
             ++i;
         }
         --i;
-        this->send_datagram_to_client(&this->clients[i].client_address, message, cur_ptr);
+        std::cout<<"Wysylam do "<<ind<<" wiadomosc:\n";
+        for (int j = 0; j < cur_ptr; ++j)
+            std::cout<<message[j];
+        std::cout<<"\n";
+        this->send_datagram_to_client(&this->clients[ind].client_address, message, cur_ptr);
+        std::cout<<"poszlo\n";
     }
-}
-
-void Server::send_events_to_clients()
-{
-    for (size_t i = 0; i < this->clients.size(); ++i)
-        if (this->clients[i].next_expected_event_no < this->events.size())
-            send_events_to_client(i);
 }
 
 void Server::add_client(Client client)
@@ -410,7 +412,7 @@ void Server::start_new_game()
     this->game = new Game(this);
     
     for (size_t i = 0; i < this->clients.size(); ++i)
-        if (this->clients[i].client_name.size() > 0 && this->clients[i].turn_direction != 0) {
+        if (this->clients[i].client_name.size() > 0) {
             this->clients[i].alive = true;
             players_name.push_back(this->clients[i].client_name);
         }
@@ -418,6 +420,7 @@ void Server::start_new_game()
     Event event(0);
     event.create_event_new_game(this->map_width, this->map_height, players_name);
     this->events.push_back(event);
+    send_event(this->events.size()-1);
 }
 
 bool Server::time_to_next_round_elapsed()
@@ -437,4 +440,5 @@ void Server::game_over()
     this->game_is_active = false;
     Event event(3);
     this->events.push_back(event);
+    send_event(this->events.size()-1);
 }

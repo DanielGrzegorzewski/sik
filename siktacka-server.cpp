@@ -17,10 +17,14 @@ int main(int argc, char *argv[]) {
             server.start_new_game();
 
         if (server.time_to_next_round_elapsed()) {
+            //std::cout<<"zaraz process_clients\n";
             server.process_clients();
-            if (server.game->check_is_game_over())
+            //std::cout<<"po processie\n";
+            if (server.game->check_is_game_over()) {
+                //std::cout<<"Zaraz game_over\n";
                 server.game_over();
-            server.send_events_to_clients();
+                //std::cout<<"Po game over\n";
+            }
         }
     }
 

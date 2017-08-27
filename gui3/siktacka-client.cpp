@@ -8,6 +8,7 @@
 
 // TODO bledy w komunikatach
 // TODO powywalac zmienne publiczne, dac gettery i settery
+// TODO czyścić wekto events po game over
 
 int main(int argc, char *argv[]) 
 {
@@ -17,19 +18,12 @@ int main(int argc, char *argv[])
     player.send_player_datagram();
 
     while (true) {
-        std::cout<<"1\n";
         player.receive_from_server();
-        std::cout<<"2\n";
         player.receive_from_gui();
-        std::cout<<"3\n";
         player.send_to_gui();
-        std::cout<<"4\n";
 
-        if (player.time_to_next_round_elapsed()) {
-            std::cout<<"5";
+        if (player.time_to_next_round_elapsed())
             player.send_player_datagram();
-            std::cout<<"6\n";
-        }
     }
 
     player.close_socket();

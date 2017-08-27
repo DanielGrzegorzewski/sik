@@ -54,8 +54,9 @@ void Player::make_socket()
 {
     struct addrinfo *addr_result;
     struct addrinfo addr_hints;
+    struct sockaddr_in6 server_address;
     (void) memset(&addr_hints, 0, sizeof(struct addrinfo));
-    addr_hints.ai_family = AF_INET; // IPv4
+    addr_hints.ai_family = AF_UNSPEC;
     addr_hints.ai_socktype = SOCK_DGRAM;
     addr_hints.ai_protocol = IPPROTO_UDP;
     addr_hints.ai_flags = 0;
@@ -64,21 +65,25 @@ void Player::make_socket()
     addr_hints.ai_canonname = NULL;
     addr_hints.ai_next = NULL;
 
-    if (getaddrinfo(this->game_server_host.c_str(), NULL, &addr_hints, &addr_result) != 0)
+    if (getaddrinfo(this->game_server_host.c_str(), std::to_string(this->server_port).c_str(), &addr_hints, &addr_result) != 0)
         syserr("getaddrinfo");
 
-    this->server_address.sin_family = AF_INET;
-    this->server_address.sin_addr.s_addr =
-        ((struct sockaddr_in*) (addr_result->ai_addr))->sin_addr.s_addr;
-    this->server_address.sin_port = htons(this->server_port);
+    this->client_address.sin6_family = AF_INET6;
+    this->client_address.sin6_port = htons(this->server_port);
+    this->client_address.sin6_flowinfo = 0;
+    this->client_address.sin6_addr = in6addr_any;
+    this->client_address.sin6_scope_id = 0;
 
-    freeaddrinfo(addr_result);
-
-    this->sock = socket(PF_INET, SOCK_DGRAM, 0);
+    this->sock = socket(AF_INET6, SOCK_DGRAM, 0);
     if (this->sock < 0)
         syserr("socket");
 
+    memcpy(&server_address, addr_result->ai_addr, addr_result->ai_addrlen);
+    if (connect(sock, (struct sockaddr*) &server_address, sizeof(server_address)) != 0)
+        syserr("connect");
+
     fcntl(this->sock, F_SETFL, O_NONBLOCK);
+    freeaddrinfo(addr_result);
 }
 
 void Player::make_gui_socket()
@@ -200,13 +205,16 @@ bool Player::process_event(std::string event)
     std::string crc_str = "";
     for (int i = 4; i < 4+len; ++i)
         crc_str += event[i];
-    if (crc != calculate_crc32(crc_str) || event_no != this->next_expected_event_no)
+    if (crc != calculate_crc32(crc_str) || event_no != this->next_expected_event_no) {
+        std::cout<<"Nie zgadza sie crc :/\n";
         return false;
+    }
 
     if (event_type == 0) {
         uint32_t map_width = get_4_byte_number(event, 9);
         uint32_t map_height = get_4_byte_number(event, 13);
         std::string message = "NEW_GAME " + std::to_string(map_width) + " " + std::to_string(map_height);
+        std::cout<<"Wysylam do gui new game\n";
         int ind = 17;
         while (ind < 4+len) {
             message += " ";
@@ -252,11 +260,7 @@ bool Player::process_event(std::string event)
         return true;
     }
     else if (event_type == 3) {
-        std::string message = "GAME OVER";
-        std::cout<<"Wysylam: \n"<<message<<"\n";
-        ++this->next_expected_event_no;
-        message += (char)10;
-        write(this->sock_gui, message.c_str(), message.size());
+        this->next_expected_event_no = 0;
         return true;
     }
     else {
@@ -291,7 +295,7 @@ void Player::send_to_gui()
 
 bool Player::time_to_next_round_elapsed()
 {
-    return (this->get_time() - this->last_time) > 20;
+    return (this->get_time() - this->last_time) > 200;
 }
 
 void Player::close_socket()

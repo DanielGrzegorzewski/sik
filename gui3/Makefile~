@@ -1,5 +1,3 @@
-TARGET: siktacka-client siktacka-server gui3
-
 SRC=cmd.c err.c net.c read_line.c
 
 CC = gcc

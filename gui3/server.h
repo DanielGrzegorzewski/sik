@@ -46,6 +46,7 @@ class Client
         bool alive;
         bool is_player;
         bool did_turn;
+        bool disconnected;
         int8_t turn_direction;
         uint32_t next_expected_event_no;
 

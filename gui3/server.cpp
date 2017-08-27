@@ -404,6 +404,8 @@ void Server::send_event(int event_id)
     std::string game_id_str = make_message_from_n_byte(this->game->game_id, 4);
     int cur_ptr, client_id;
     for (client_id = 0; client_id < this->clients.size(); ++client_id) {
+        if (this->clients[client_id].disconnected)
+            continue;
         for (cur_ptr = 0; cur_ptr < 4; ++cur_ptr)
             message[cur_ptr] = game_id_str[cur_ptr];
         std::string event_str = this->events[event_id].to_string(event_id);
@@ -574,6 +576,11 @@ void Server::game_over()
     this->game_is_active = false;
     for (size_t i = 0; i < this->clients.size(); ++i)
         this->clients[i].did_turn = false;
+    for (int i = 0; i < (int)this->clients.size(); ++i)
+        if (this->clients[i].disconnected) {
+            this->clients.erase(this->clients.begin()+i);
+            --i;
+        }
     Event event(3);
     this->events.push_back(event);
     send_event(this->events.size()-1);

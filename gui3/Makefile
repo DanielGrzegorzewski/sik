@@ -1,19 +1,10 @@
-TARGET: siktacka-client siktacka-server gui3
-
-SRC=cmd.c err.c net.c read_line.c
-
-CC = gcc
-
-CFLAGS=-std=c99 -Wall -Wunused -DDEBUG
+TARGET: siktacka-client siktacka-server
 
 siktacka-client: siktacka-client.cpp
-	g++ siktacka-client.cpp err.c player.cpp helper.cpp parser.cpp -o siktacka-client -std=c++11
+	g++ siktacka-client.cpp err.c player.cpp helper.cpp parser.cpp -o siktacka-client -O2 -Wall -std=c++11
 	
 siktacka-server: siktacka-server.cpp
-	g++ siktacka-server.cpp err.c helper.cpp server.cpp -o siktacka-server -std=c++11
-
-gui3: gui3.c $(SRC) gui.h 
-	$(CC) $(CFLAGS) gui3.c $(SRC) -o gui3 `pkg-config gtk+-3.0 --cflags --libs`
+	g++ siktacka-server.cpp err.c helper.cpp server.cpp -o siktacka-server -O2 -Wall -std=c++11
 
 clean: 
-	rm -f *.o gui3 siktacka-client siktacka-server
+	rm -f *.o siktacka-client siktacka-server

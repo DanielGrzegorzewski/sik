@@ -9,7 +9,7 @@ void set_server_port(std::string &game_server_host, uint16_t &server_port);
 
 void set_ui_port(std::string &ui_server_host, uint16_t &ui_port);
 
-bool parse_client_arguments(int argc, char *argv[], std::string &player_name, std::string &game_server_host, 
+void parse_client_arguments(int argc, char *argv[], std::string &player_name, std::string &game_server_host, 
 							uint16_t &server_port, std::string &ui_server_host, uint16_t &ui_port);
 
 #endif

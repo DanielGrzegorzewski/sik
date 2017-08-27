@@ -6,9 +6,6 @@
 #include "helper.h"
 #include "err.h"
 
-// TODO co jak przyjdzie Datagram od disconnected osoby
-// TODO bledy w komunikatach
-
 int main(int argc, char *argv[]) 
 {
     Player player(argc, argv);

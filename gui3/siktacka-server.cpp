@@ -5,8 +5,6 @@
 #include "server.h"
 #include "err.h"
 
-// ADD TO GAME OVER REMOVING DISCONNECTED CLIENTS
-
 int main(int argc, char *argv[]) {
 
     Server server(argc, argv);

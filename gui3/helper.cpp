@@ -21,7 +21,7 @@ void send_datagram(Player *player, unsigned char *datagram, int len)
 ssize_t receive_datagram(Player *player, unsigned char *datagram, int len)
 {
     ssize_t rcv_len;
-    memset(datagram, 0, sizeof(datagram));
+    memset(datagram, 0, len);
     rcv_len = read(player->sock, datagram, len);
     return rcv_len;
 }

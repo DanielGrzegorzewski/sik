@@ -20,9 +20,13 @@ std::string get_string_from_datagram(unsigned char *datagram, uint8_t from, uint
     return result_string;
 }
 
-// datagram size 100, zal: >= 13, < 100, sprawdzic dla == 100 (>=100 tez) czy if bedzie dzialal (Wyslac dlugie imie)
 bool parse_datagram(unsigned char *datagram, uint32_t len, uint64_t &session_id, int8_t &turn_direction, uint32_t &next_expected_event_no, std::string &player_name)
 {
+    if (len < MIN_PLAYER_DATAGRAM_SIZE)
+        return false;
+    if (len > MAX_PLAYER_DATAGRAM_SIZE)
+        return false;
+
     unsigned char session_id_str[8];
     for (size_t i = 0; i < 8; ++i)
         session_id_str[i] = datagram[i];
@@ -36,14 +40,16 @@ bool parse_datagram(unsigned char *datagram, uint32_t len, uint64_t &session_id,
 
     session_id = read_8_byte_number(session_id_str);
     turn_direction = read_1_byte_number(turn_direction_str);
+    if (turn_direction < -1 || turn_direction > 1)
+        return false;
     next_expected_event_no = read_4_byte_number(next_expected_event_no_str);
     player_name = get_string_from_datagram(datagram, 13, len-1);
 
-    if (player_name.size() > 64)
+    if (player_name.size() > MAX_PLAYER_NAME_LENGTH)
         return false;
 
     for (size_t i = 0; i < player_name.size(); ++i)
-        if (player_name[i] < 33 || player_name[i] > 126)
+        if (player_name[i] < MIN_PLAYER_NAME_ASCII || player_name[i] > MAX_PLAYER_NAME_ASCII)
             return false;
 
     return true;
@@ -100,6 +106,7 @@ Client::Client(Server *server, struct sockaddr_in6 client_address, uint64_t sess
     this->alive = false;
     this->is_player = false;
     this->did_turn = false;
+    this->disconnected = false;
     this->turn_direction = turn_direction;
     this->next_expected_event_no = next_expected_event_no;
 }
@@ -148,14 +155,16 @@ void Server::make_socket()
 // mniejsza od 2^20, w.p.p zwraca 2^30
 uint64_t get_int(char *buffer)
 {
-    uint64_t result = 1<<30;
+    uint64_t result = (1<<30);
     int len = strlen(buffer);
-    if (len >= 7)
+    if (len >= 8)
         return result;
     for (int i = 0; i < len; ++i)
         if (buffer[i] < '0' || buffer[i] > '9')
             return result;
     result = (uint64_t)atoi(buffer);
+    if (result >= (1<<20))
+        result = (1<<30);
     return result;
 }
 
@@ -226,13 +235,12 @@ ssize_t Server::receive_datagram_from_client(unsigned char *datagram, int len, s
     int flags = 0;
     socklen_t rcva_len;
 
-    memset(datagram, 0, sizeof(datagram));
+    size_t datagram_size = sizeof(datagram);
+    memset(datagram, 0, datagram_size);
     rcva_len = (socklen_t) sizeof(srvr_address);
     rcv_len = recvfrom(this->sock, datagram, len, flags,
         (struct sockaddr *) &srvr_address, &rcva_len);
     return rcv_len;
-    //if (rcv_len < 0)
-    //    syserr("error on datagram from client socket");
 }
 
 uint32_t get_4_byte_number(std::string str, int from)
@@ -250,65 +258,6 @@ int8_t get_1_byte_number(std::string str, int from)
     return read_1_byte_number(number_str);
 }
 
-void print_datagram(Server *server, std::string event)
-{
-    uint32_t len = get_4_byte_number(event, 0);
-    uint32_t event_no = get_4_byte_number(event, 4);
-    int8_t event_type = get_1_byte_number(event, 8);
-    uint32_t crc = get_4_byte_number(event, 4+len);
-    std::string crc_str = "";
-    for (int i = 0; i < 4+len; ++i)
-        crc_str += event[i];
-    if (crc != calculate_crc32(crc_str)) {
-        std::cout<<"crc nie pyka\n";
-        return;
-    }
-
-    if (event_type == 0) {
-        uint32_t map_width = get_4_byte_number(event, 9);
-        uint32_t map_height = get_4_byte_number(event, 13);
-        std::string message = "event_no: " + std::to_string(event_no) + ", data: NEW_GAME " + std::to_string(map_width) + " " + std::to_string(map_height);
-        int ind = 17;
-        while (ind < 4+len) {
-            message += " ";
-            std::string name = "";
-            while (ind < 4+len && event[ind] != '\0')
-                name += event[ind++];
-            message += name;
-            ++ind;
-        }
-        std::cout<<message<<"\n";
-        return;
-    }
-    else if (event_type == 1) {
-        int8_t player_number = get_1_byte_number(event, 9);
-        uint32_t player_x = get_4_byte_number(event, 10);
-        uint32_t player_y = get_4_byte_number(event, 14);
-        std::string message = "event_no: " + std::to_string(event_no) + ", data: PIXEL ";
-        message += std::to_string(player_x);
-        message += " " + std::to_string(player_y);
-        message += " " + server->clients[player_number].client_name;
-        std::cout<<message<<"\n";
-        return;
-    }
-    else if (event_type == 2) {
-        int8_t player_number = get_1_byte_number(event, 9);
-        std::string message = "event_no: " + std::to_string(event_no) + ", data: PLAYER_ELIMINATED ";
-        message += server->clients[player_number].client_name;
-        message += (char)10;
-        return;
-    }
-    else if (event_type == 3) {
-        std::string message = "event_no: " + std::to_string(event_no) + ", data: GAME OVER";
-        std::cout<<message<<"\n";
-        return;
-    }
-    else {
-        std::cout<<"cosniedziala\n";
-        return;
-    }
-}
-
 std::string get_event(unsigned char *events, int ind)
 {
     unsigned char event_len_str[4];
@@ -316,23 +265,9 @@ std::string get_event(unsigned char *events, int ind)
         event_len_str[i] = events[ind+i];
     uint32_t len = read_4_byte_number(event_len_str);
     std::string event = "";
-    for (int i = 0; i < 4+len+4; ++i)
+    for (size_t i = 0; i < 4+len+4; ++i)
         event += events[ind+i];
     return event;
-}
-
-void print_dat(Server *server, unsigned char *events, int len)
-{
-        unsigned char game_id_str[4];
-        for (int j = 0; j < 4; ++j)
-            game_id_str[j] = events[j];
-        uint32_t game_id = read_4_byte_number(game_id_str);
-        std::cout<<"game id = "<<game_id<<"\n";
-        for (size_t j = 4; j < len; ++j) {
-            std::string event = get_event(events, j);
-            print_datagram(server, event);
-            j += event.size()-1;
-        }
 }
 
 void Server::send_datagram_to_client(struct sockaddr_in6 *client_address, unsigned char *datagram, int len)
@@ -342,26 +277,24 @@ void Server::send_datagram_to_client(struct sockaddr_in6 *client_address, unsign
     ssize_t snd_len;
 
     snda_len = (socklen_t) sizeof(*client_address);
-    std::cout<<"Wysylam datagram o len = "<<len<<"\n";
-    std::cout<<"Odkodowany datagram: \n";
-    print_dat(this, datagram, len);
     snd_len = sendto(this->sock, datagram, (size_t) len, sflags,
             (struct sockaddr *) client_address, snda_len);
     if (snd_len != len)
-        syserr("error on sending datagram to client socket");
+        syserr("ERROR ON SENDING DATAGRAM TO CLIENT SOCKET");
 }
 
 void Server::read_datagrams()
 {
-    unsigned char buffer[555];
+    unsigned char buffer[MORE_THAN_MAX_DATAGRAM_SIZE];
     struct sockaddr_in6 client_address;
     ssize_t len = this->receive_datagram_from_client(buffer, sizeof(buffer)-1, client_address, len);
 
     while (len > 0) {
         Datagram datagram(buffer, len);
-        std::cout<<"Odczytalem datagram o len = "<<len<<"\n";
-        if (!datagram.correct_datagram)
+        if (!datagram.correct_datagram) {
+            std::cerr<<"ERROR WRONG DATAGRAM FROM CLIENT\n";
             continue;
+        }
         int ind = this->find_index_of_client(client_address, datagram.session_id, datagram.player_name);
         if (ind == -1) {
             Client client(this, client_address, datagram.session_id, datagram.player_name, datagram.turn_direction, datagram.next_expected_event_no);
@@ -391,7 +324,7 @@ int Server::client_index_from_players(int ind)
 
 bool Server::check_collision(int x, int y)
 {
-    if (x < 0 || y < 0 || x >= this->map_width || y >= this->map_height)
+    if (x < 0 || y < 0 || x >= (int)this->map_width || y >= (int)this->map_height)
         return true;
     if (this->game->occupied_pixels.find(std::make_pair(x, y)) != this->game->occupied_pixels.end())
         return true;
@@ -402,16 +335,16 @@ void Server::send_event(int event_id)
 {
     unsigned char message[MESSAGE_FROM_SERVER_MAX_SIZE];
     std::string game_id_str = make_message_from_n_byte(this->game->game_id, 4);
-    int cur_ptr, client_id;
+    int cur_ptr;
+    size_t client_id;
     for (client_id = 0; client_id < this->clients.size(); ++client_id) {
         if (this->clients[client_id].disconnected)
             continue;
         for (cur_ptr = 0; cur_ptr < 4; ++cur_ptr)
             message[cur_ptr] = game_id_str[cur_ptr];
         std::string event_str = this->events[event_id].to_string(event_id);
-        for (int j = 0; j < event_str.size(); ++j)
+        for (size_t j = 0; j < event_str.size(); ++j)
             message[cur_ptr++] = event_str[j];
-        std::cout<<"Wysylam event o len = "<<cur_ptr<<"\n";
         this->send_datagram_to_client(&this->clients[client_id].client_address, message, cur_ptr);
     }
 }
@@ -466,17 +399,12 @@ void Server::send_events_to_client(int ind)
             message[cur_ptr] = game_id_str[cur_ptr];
         while (i < to && cur_ptr + this->events[i].to_string(i).size() < MESSAGE_FROM_SERVER_MAX_SIZE) {
             std::string event_str = this->events[i].to_string(i);
-            for (int j = 0; j < event_str.size(); ++j)
+            for (size_t j = 0; j < event_str.size(); ++j)
                 message[cur_ptr++] = event_str[j];
             ++i;
         }
         --i;
-        std::cout<<"Wysylam do "<<this->clients[ind].client_name<<", tj id = "<<ind<<" wiadomosc:\n";
-        for (int j = 0; j < cur_ptr; ++j)
-            std::cout<<message[j];
-        std::cout<<"\n";
         this->send_datagram_to_client(&this->clients[ind].client_address, message, cur_ptr);
-        std::cout<<"poszlo\n";
     }
 }
 

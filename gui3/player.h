@@ -26,6 +26,8 @@ class Player
         bool left_push;
         bool right_push;
         bool active_game;
+        uint32_t map_width;
+        uint32_t map_height;
         bool did_push;
 
         Player(int argc, char *argv[]);

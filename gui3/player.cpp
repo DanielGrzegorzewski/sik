@@ -82,8 +82,7 @@ void Player::make_socket()
     if (this->sock < 0)
         syserr("socket");
 
-    memcpy(&server_address, addr_result->ai_addr, addr_result->ai_addrlen);
-    if (connect(sock, (struct sockaddr*) &server_address, sizeof(server_address)) != 0)
+    if (connect(sock, addr_result->ai_addr, addr_result->ai_addrlen) != 0)
         syserr("connect");
 
     fcntl(this->sock, F_SETFL, O_NONBLOCK);
@@ -151,7 +150,7 @@ void Player::receive_from_gui()
     memset(buffer, 0, sizeof(buffer));
     ssize_t rcv_len = read(this->sock_gui, buffer, sizeof(buffer) - 1);
 
-    //while (rcv_len > 0) {
+    while (rcv_len > 0) {
         std::string buffer_str(buffer);
         std::string message;
         std::istringstream iss(buffer_str);
@@ -165,9 +164,9 @@ void Player::receive_from_gui()
             else if (message == "RIGHT_KEY_UP")
                 this->right_push = false;
         }
-        //memset(buffer, 0, sizeof(buffer));
-       // rcv_len = read(this->sock_gui, buffer, sizeof(buffer) - 1);
-    //}
+        memset(buffer, 0, sizeof(buffer));
+        rcv_len = read(this->sock_gui, buffer, sizeof(buffer) - 1);
+    }
     bool left = this->left_push;
     bool right = this->right_push;
     if (left && !right)
@@ -221,12 +220,16 @@ bool Player::process_event(std::string event, uint32_t game_id)
         std::cout<<"Nie zgadza sie crc :/\n";
         return false;
     }
-    if (this->next_expected_event_no != event_no)
+    if (this->next_expected_event_no != event_no) {
+        std::cout<<"next exp :(\n";
         return false;
+    }
 
     if (event_type == 0) {
-        if (this->active_game)
+        if (this->active_game) {
+            std::cout<<"ju aktywna :(\n";
             return false;
+        }
         uint32_t map_width = get_4_byte_number(event, 9);
         uint32_t map_height = get_4_byte_number(event, 13);
         std::string message = "NEW_GAME " + std::to_string(map_width) + " " + std::to_string(map_height);
@@ -254,8 +257,13 @@ bool Player::process_event(std::string event, uint32_t game_id)
         return true;
     }
     else if (event_type == 1) {
-        if (!this->active_game || this->game_id != game_id)
+        if (!this->active_game || this->game_id != game_id) {
+            if (!this->active_game)
+                std::cout<<"ni ma gry jeszzcze :(\n";
+            if (this->game_id != game_id)
+                std::cout<<"game_id sie nie zgadza :(\n";
             return false;
+        }
         int8_t player_number = get_1_byte_number(event, 9);
         uint32_t player_x = get_4_byte_number(event, 10);
         uint32_t player_y = get_4_byte_number(event, 14);

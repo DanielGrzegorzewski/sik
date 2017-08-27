@@ -7,8 +7,6 @@
 #include "err.h"
 
 // TODO bledy w komunikatach
-// TODO powywalac zmienne publiczne, dac gettery i settery
-// TODO czyścić wekto events po game over
 
 int main(int argc, char *argv[]) 
 {

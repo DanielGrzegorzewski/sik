@@ -44,6 +44,7 @@ class Client
         std::string client_name;
         bool alive;
         bool is_player;
+        bool did_turn;
         int8_t turn_direction;
         uint32_t next_expected_event_no;
 

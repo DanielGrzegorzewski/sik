@@ -26,6 +26,7 @@ class Player
         bool left_push;
         bool right_push;
         bool active_game;
+        bool did_push;
 
         Player(int argc, char *argv[]);
         void make_socket();

@@ -7,7 +7,7 @@
 bool check_player_name(std::string name)
 {
 	size_t i;
-	if (name.length() < 1 || name.length() > 64)
+	if (name.length() > 64)
 		return false;
 	for (i = 0; i < name.size(); ++i)
 		if (name[i] < 33 || name[i] > 126)
@@ -80,4 +80,3 @@ bool parse_client_arguments(int argc, char *argv[], std::string &player_name, st
 		ui_server_host = argv[3];
 	set_ui_port(ui_server_host, ui_port);
 }
-

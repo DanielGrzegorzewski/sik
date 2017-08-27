@@ -99,7 +99,9 @@ Client::Client(Server *server, struct sockaddr_in6 client_address, uint64_t sess
     this->client_name = client_name;
     this->alive = false;
     this->is_player = false;
+    this->did_turn = false;
     this->turn_direction = turn_direction;
+    this->next_expected_event_no = next_expected_event_no;
 }
 
 bool cmp(Client &client1, Client &client2)
@@ -263,8 +265,6 @@ void print_datagram(Server *server, std::string event)
     }
 
     if (event_type == 0) {
-        if (server->clients[0].client_name[0] == 'n')
-            syserr("wtf");
         uint32_t map_width = get_4_byte_number(event, 9);
         uint32_t map_height = get_4_byte_number(event, 13);
         std::string message = "event_no: " + std::to_string(event_no) + ", data: NEW_GAME " + std::to_string(map_width) + " " + std::to_string(map_height);
@@ -371,6 +371,8 @@ void Server::read_datagrams()
         else {
             std::cout<<"Ustawiam turn_direction id = "<<ind<<" na "<<(int)datagram.turn_direction<<"\n";
             this->clients[ind].turn_direction = datagram.turn_direction;
+            if (datagram.turn_direction != 0)
+                this->clients[ind].did_turn = true;
             this->clients[ind].next_expected_event_no = datagram.next_expected_event_no;
         }
         this->send_events_to_client(ind);
@@ -502,7 +504,7 @@ bool Server::can_start_new_game()
 {
     size_t ready_clients = 0;
     for (size_t i = 0; i < this->clients.size(); ++i) {
-        if (this->clients[i].client_name.size() > 0 && this->clients[i].turn_direction == 0)
+        if (this->clients[i].client_name.size() > 0 && !(this->clients[i].did_turn))
             return false;
         else if (this->clients[i].client_name.size() > 0)
             ++ready_clients;
@@ -550,6 +552,8 @@ void Server::game_over()
 {
     delete this->game;
     this->game_is_active = false;
+    for (size_t i = 0; i < this->clients.size(); ++i)
+        this->clients[i].did_turn = false;
     Event event(3);
     this->events.push_back(event);
     send_event(this->events.size()-1);

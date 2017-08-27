@@ -37,6 +37,7 @@ class Client
     public:
         Server *server;
         uint64_t session_id;
+        uint64_t last_message; 
         struct sockaddr_in6 client_address;
         double head_x;
         double head_y;
@@ -104,9 +105,10 @@ class Server
         bool check_collision(int x, int y);
         void add_client(Client client);
         int client_index_from_players(int ind);
-        int find_index_of_client(struct sockaddr_in6 client_address, uint64_t session_id);
+        int find_index_of_client(struct sockaddr_in6 client_address, uint64_t session_id, std::string player_name);
         bool can_start_new_game();
         void start_new_game();
+        void disconnect_if_needed();
         bool time_to_next_round_elapsed();
         void close_socket();
         void game_over();

@@ -362,20 +362,20 @@ void Server::read_datagrams()
         std::cout<<"Odczytalem datagram o len = "<<len<<"\n";
         if (!datagram.correct_datagram)
             continue;
-        int ind = this->find_index_of_client(client_address, datagram.session_id);
+        int ind = this->find_index_of_client(client_address, datagram.session_id, datagram.player_name);
         if (ind == -1) {
             Client client(this, client_address, datagram.session_id, datagram.player_name, datagram.turn_direction, datagram.next_expected_event_no);
             this->add_client(client);
-            ind = this->find_index_of_client(client_address, datagram.session_id);
+            ind = this->find_index_of_client(client_address, datagram.session_id, datagram.player_name);
         }
-        else {
-            std::cout<<"Ustawiam turn_direction id = "<<ind<<" na "<<(int)datagram.turn_direction<<"\n";
+        else if (ind >= 0) {
             this->clients[ind].turn_direction = datagram.turn_direction;
             if (datagram.turn_direction != 0)
                 this->clients[ind].did_turn = true;
             this->clients[ind].next_expected_event_no = datagram.next_expected_event_no;
         }
-        this->send_events_to_client(ind);
+        if (ind != -2)
+            this->send_events_to_client(ind);
         len = this->receive_datagram_from_client(buffer, sizeof(buffer)-1, client_address, len);
     }
 }
@@ -455,6 +455,7 @@ void Server::send_events_to_client(int ind)
 {
     int from = this->clients[ind].next_expected_event_no;
     int to = this->events.size();
+    this->clients[ind].last_message = this->get_time();
     for (int i = from; i < to; ++i) {
         unsigned char message[MESSAGE_FROM_SERVER_MAX_SIZE];
         std::string game_id_str = make_message_from_n_byte(this->game->game_id, 4);
@@ -490,13 +491,32 @@ uint64_t Server::get_time()
     return (uint64_t)tp.tv_sec*1000 + tp.tv_usec/1000;
 }
 
-int Server::find_index_of_client(struct sockaddr_in6 client_address, uint64_t session_id)
+void Server::disconnect_if_needed()
 {
+    for (size_t i = 0; i < this->clients.size(); ++i)
+        if (this->get_time() - this->clients[i].last_message > 2000)
+            this->clients[i].disconnected = true;
+}
+
+int Server::find_index_of_client(struct sockaddr_in6 client_address, uint64_t session_id, std::string player_name)
+{
+    bool known_sock = false;
+    bool known_name = false;
     for (size_t i = 0; i < (this->clients.size()); ++i) {
         Client client = this->clients[i];
+        if (memcmp(&client.client_address, &client_address, sizeof(client_address)) == 0)
+            known_sock = true;
+        if (client.client_name == player_name)
+            known_name = true;
+        if (client.session_id < session_id && memcmp(&client.client_address, &client_address, sizeof(client_address)) == 0)
+            client.session_id = session_id;
         if (client.session_id == session_id && memcmp(&client.client_address, &client_address, sizeof(client_address)) == 0)
             return i;
+        if (client.session_id > session_id && memcmp(&client.client_address, &client_address, sizeof(client_address)) == 0)
+            return -2;
     }
+    if (!known_sock && known_name)
+        return -2;
     return -1;
 }
 

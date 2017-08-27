@@ -5,6 +5,8 @@
 #include "server.h"
 #include "err.h"
 
+// ADD TO GAME OVER REMOVING DISCONNECTED CLIENTS
+
 int main(int argc, char *argv[]) {
 
     Server server(argc, argv);
@@ -12,6 +14,7 @@ int main(int argc, char *argv[]) {
 
     while (true) {
         server.read_datagrams();
+        server.disconnect_if_needed();
         if (!server.game_is_active && server.can_start_new_game())
             server.start_new_game();
         if (server.time_to_next_round_elapsed()) {

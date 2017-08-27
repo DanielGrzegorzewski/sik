@@ -137,7 +137,11 @@ void Player::receive_from_server()
         std::cout<<"Dostalem z serva o size = "<<len<<"\n";
         for (int i = 0; i < len; ++i)
             event += buffer[i];
+        if (this->player_name == "")
+            std::cout<<"size = "<<this->events_from_server.size()<<"\n";
         this->events_from_server.push_back(event);
+        if (this->player_name == "")
+            std::cout<<"a teraz size = "<<this->events_from_server.size()<<"\n";
         //std::cout<<"Probuje pobrac\n";
         len = receive_datagram(this, buffer, sizeof(buffer)-1);
         //std::cout<<"Pobrane\n";
